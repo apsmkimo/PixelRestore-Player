@@ -64,6 +64,9 @@ object ProcessingProfileResolver {
                 scaling,
                 upscaling,
             )
+            // SMCPKG_SUPPORT>>>Cursor045
+            ProcessingMode.ML_ENHANCE -> listOf(FilterPass(FilterType.ML_ENHANCE, 1f))
+            // SMCPKG_SUPPORT<<<Cursor046
         }
         val autoAdapted = adaptation.maxHeight != null || adaptation.maxFps != null
         return ResolvedProfile(
@@ -148,6 +151,9 @@ object ProcessingProfileResolver {
                 OutputResolution.P720 -> 720
                 OutputResolution.P1080 -> 1080
             }
+            // SMCPKG_SUPPORT>>>Cursor047
+            ProcessingMode.ML_ENHANCE -> if (videoHeight > 0) videoHeight else 0
+            // SMCPKG_SUPPORT<<<Cursor048
         }
         if (requested <= 0) return 0
         if (settings.mode == ProcessingMode.MOSAIC_RESTORATION &&
@@ -160,6 +166,9 @@ object ProcessingProfileResolver {
         ) {
             return requested
         }
+        // SMCPKG_SUPPORT>>>Cursor049
+        if (settings.mode == ProcessingMode.ML_ENHANCE) return requested
+        // SMCPKG_SUPPORT<<<Cursor050
         return clampManual(requested, allowed)
     }
 

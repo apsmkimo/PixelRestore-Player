@@ -13,6 +13,11 @@ data class MosaicGrid(
     val confidence: Float,
     val detected: Boolean,
     val manual: Boolean,
+    // SMCPKG_SUPPORT>>>Cursor031
+    // Auto can miss a soft frame. [held] means the previous block size is still in use.
+    val held: Boolean = false,
+    val note: String = "",
+    // SMCPKG_SUPPORT<<<Cursor032
 ) {
     val usable: Boolean get() = blockWidth >= 2 && blockHeight >= 2 && (detected || manual)
 

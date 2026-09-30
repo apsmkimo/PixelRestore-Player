@@ -40,11 +40,20 @@ internal abstract class ConfiguredProcessor(
             is FrameHandle.Cpu -> {
                 // SMCPKG_SUPPORT>>>Cursor021
                 // val pixels = CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
-                val pixels = if (passes.any { it.type == FilterType.MOSAIC_RECONSTRUCT } && mosaicRuntime != null) {
-                    mosaicRuntime!!.processCpu(frame.pixels, frame.width, frame.height)
-                } else {
-                    CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
+                // SMCPKG_SUPPORT>>>Cursor041
+                // val pixels = if (passes.any { it.type == FilterType.MOSAIC_RECONSTRUCT } && mosaicRuntime != null) {
+                //     mosaicRuntime!!.processCpu(frame.pixels, frame.width, frame.height)
+                // } else {
+                //     CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
+                // }
+                val pixels = when {
+                    passes.any { it.type == FilterType.ML_ENHANCE } && mosaicRuntime != null ->
+                        mosaicRuntime!!.processMl(frame.pixels, frame.width, frame.height)
+                    passes.any { it.type == FilterType.MOSAIC_RECONSTRUCT } && mosaicRuntime != null ->
+                        mosaicRuntime!!.processCpu(frame.pixels, frame.width, frame.height)
+                    else -> CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
                 }
+                // SMCPKG_SUPPORT<<<Cursor042
                 // SMCPKG_SUPPORT<<<Cursor022
                 ProcessedFrame(ProcessingBackend.CPU, frame.width, frame.height, pixels)
             }
@@ -141,6 +150,11 @@ class ProcessingManager {
             ProcessingMode.OFF -> passthrough
             ProcessingMode.MOSAIC_RESTORATION -> mosaic
             ProcessingMode.VIDEO_ENHANCEMENT -> enhancement
+            // SMCPKG_SUPPORT>>>Cursor043
+            // GPU frames stay a blit. PlayerViewModel switches this mode onto the CPU
+            // so processMl actually sees pixels.
+            ProcessingMode.ML_ENHANCE -> mosaic
+            // SMCPKG_SUPPORT<<<Cursor044
         }
     }
 

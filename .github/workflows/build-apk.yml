@@ -2,6 +2,7 @@
 #
 # Triggers:
 #   - push of a tag matching v*  (also publishes a GitHub Release)
+#   - push to main or cursor/** (artifacts only)
 #   - Actions tab → Run workflow (workflow_dispatch; artifacts only)
 #
 # This is a small custom workflow instead of alsrb968/action-release-apk.
@@ -19,6 +20,12 @@ on:
   push:
     tags:
       - "v*"
+    # SMCPKG_SUPPORT>>>Cursor083
+    # Feature branches build debug and unsigned-release APKs on push.
+    branches:
+      - "cursor/**"
+      - "main"
+    # SMCPKG_SUPPORT<<<Cursor084
   workflow_dispatch:
 
 permissions:

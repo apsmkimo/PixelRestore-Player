@@ -12,6 +12,9 @@ lifecycle = "2.11.0"
 datastore = "1.2.1"
 coroutines = "1.10.2"
 junit = "4.13.2"
+# SMCPKG_SUPPORT>>>Cursor075
+onnxruntime = "1.22.0"
+# SMCPKG_SUPPORT<<<Cursor076
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,6 +34,9 @@ androidx-datastore = { group = "androidx.datastore", name = "datastore-preferenc
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+# SMCPKG_SUPPORT>>>Cursor077
+onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
+# SMCPKG_SUPPORT<<<Cursor078
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

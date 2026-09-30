@@ -57,6 +57,10 @@ internal object ShaderSources {
         FilterType.SCALE_BILINEAR, FilterType.BLIT -> ShaderKind.BLIT
         FilterType.MOSAIC_RECONSTRUCT -> ShaderKind.MOSAIC_SPATIAL
         FilterType.MOSAIC_TEMPORAL -> ShaderKind.MOSAIC_TEMPORAL
+        // SMCPKG_SUPPORT>>>Cursor051
+        // The network runs on the CPU. A GPU frame only copies the picture.
+        FilterType.ML_ENHANCE -> ShaderKind.BLIT
+        // SMCPKG_SUPPORT<<<Cursor052
     }
 
     private fun body(kind: ShaderKind): String = when (kind) {

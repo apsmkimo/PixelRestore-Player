@@ -28,7 +28,10 @@
     <string name="privacy_body">All playback and processing happen on this device. PixelRestore Player does not upload videos, does not use cloud processing, remote inference, or AI APIs, and does not include analytics or tracking. The app does not request Internet access.</string>
     <string name="mosaic_disclaimer">Mosaic Reconstruction estimates detail from the pixelation grid and neighboring frames. It is mosaic artifact removal, not recovery of the original pixels. Blur-then-sharpen is not the mosaic path.</string>
     <string name="block_size">Block size</string>
-    <string name="block_size_hint">Auto estimates the square size and phase from a center crop. If auto misses, pick 2×2 through 32×32.</string>
+    <!-- SMCPKG_SUPPORT>>>Cursor063 -->
+    <!-- <string name="block_size_hint">Auto estimates the square size and phase from a center crop. If auto misses, pick 2×2 through 32×32.</string> -->
+    <string name="block_size_hint">Auto estimates the square size and phase, including softer block edges. If Auto misses, the last block is kept for a few frames, then the status asks you to pick 2×2 through 32×32.</string>
+    <!-- SMCPKG_SUPPORT<<<Cursor064 -->
     <string name="quality_hint">Low: block bilinear and sharpen. Medium: edge-aware, deblock, temporal match, sharpen. High adds Catmull-Rom on smooth areas and a wider motion search. Medium is the 720p / 30 FPS target.</string>
     <string name="mosaic_debug">Mosaic Debug Mode</string>
     <string name="mosaic_debug_hint">Shows Original, the detected grid, the reconstruction, or the final image, plus block size and offset.</string>
@@ -36,7 +39,12 @@
     <string name="compare_original">Original</string>
     <string name="compare_processed">Processed</string>
     <string name="compare_toggle">Original / Processed</string>
-    <string name="no_ai">This app does not use AI or machine-learning models.</string>
+    <!-- SMCPKG_SUPPORT>>>Cursor065 -->
+    <!-- <string name="no_ai">This app does not use AI or machine-learning models.</string> -->
+    <string name="no_ai">ML Enhance is optional and on-device. It uses the bundled SESR-M5 INT8 model (Apache-2.0, about 120 KB). It does not download weights, does not use a cloud API, and does not recover the original pixels. Mosaic Reconstruction stays classical.</string>
+    <string name="ml_section">ML Enhance (SESR-M5)</string>
+    <string name="ml_disclaimer">One 512×512 tile per frame, 2× inside the network, blended back onto the mosaic ROI (or the whole frame). Runs on the CPU with ONNX Runtime. This is a detail estimate, not exact pixel recovery. Real-ESRGAN is not bundled.</string>
+    <!-- SMCPKG_SUPPORT<<<Cursor066 -->
     <string name="video_surface">Video playback surface</string>
     <string name="seek">Seek</string>
 </resources>

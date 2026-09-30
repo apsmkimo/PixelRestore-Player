@@ -35,6 +35,20 @@ class MosaicReconstructionTest {
     }
 
     @Test
+    fun softBlurredLatticeIsStillDetected() {
+        val width = 96
+        val height = 96
+        val block = 8
+        val mosaic = MosaicReconstruction.pixelateAverage(scene(width, height), width, height, block, 0, 0)
+        val blurred = boxBlur(mosaic, width, height, radius = 1)
+        val grid = MosaicDetector.detect(blurred, width, height, manualBlock = null)
+        assertTrue("soft block detected, confidence ${grid.confidence}", grid.detected)
+        assertEquals(block, grid.blockWidth)
+        assertTrue(kotlin.math.abs(grid.offsetX) <= 1)
+        assertTrue(kotlin.math.abs(grid.offsetY) <= 1)
+    }
+
+    @Test
     fun manualBlockSizeIsUsedWhenAutoWouldMiss() {
         val width = 64
         val height = 64
@@ -233,4 +247,29 @@ class MosaicReconstructionTest {
     }
 
     private fun argb(r: Int, g: Int, b: Int): Int = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+
+    private fun boxBlur(source: IntArray, width: Int, height: Int, radius: Int): IntArray {
+        val out = IntArray(source.size)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                var r = 0
+                var g = 0
+                var b = 0
+                var count = 0
+                for (yy in (y - radius)..(y + radius)) {
+                    if (yy !in 0 until height) continue
+                    for (xx in (x - radius)..(x + radius)) {
+                        if (xx !in 0 until width) continue
+                        val color = source[yy * width + xx]
+                        r += (color shr 16) and 0xFF
+                        g += (color shr 8) and 0xFF
+                        b += color and 0xFF
+                        count++
+                    }
+                }
+                out[y * width + x] = argb(r / count, g / count, b / count)
+            }
+        }
+        return out
+    }
 }
