@@ -8,6 +8,7 @@ data class FrameTiming(
     val overBudgetSustained: Boolean,
     val actualWidth: Int,
     val actualHeight: Int,
+    val gpuTimeMs: Float = 0f,
 )
 
 /**
@@ -80,5 +81,6 @@ class PerformanceTracker {
         overBudgetSustained = sustained,
         actualWidth = width,
         actualHeight = height,
+        gpuTimeMs = lastFrameMs,
     )
 }

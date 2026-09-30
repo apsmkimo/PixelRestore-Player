@@ -19,6 +19,8 @@ object CpuPixelFilters {
                 FilterType.SHARPEN -> sharpen(current, w, h, pass.strength)
                 FilterType.CONTRAST -> contrast(current, pass.strength, pass.secondary)
                 FilterType.SCALE_BILINEAR, FilterType.SCALE_BICUBIC, FilterType.BLIT -> current
+                // Mosaic reconstruction is applied by MosaicRuntime before this loop.
+                FilterType.MOSAIC_RECONSTRUCT, FilterType.MOSAIC_TEMPORAL -> current
             }
         }
         return current

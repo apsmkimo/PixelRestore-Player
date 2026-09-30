@@ -14,6 +14,10 @@ enum class FilterType {
     DENOISE,
     CONTRAST,
     BLIT,
+    /** Lattice reconstruction. [FilterPass.strength] is 0 low, 1 medium, 2 high. */
+    MOSAIC_RECONSTRUCT,
+    /** Block-match blend with the previous reconstruction, then sharpen. */
+    MOSAIC_TEMPORAL,
 }
 
 data class FilterPass(

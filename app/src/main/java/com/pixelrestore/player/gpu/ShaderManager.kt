@@ -73,6 +73,7 @@ internal class ShaderManager {
         val names = arrayOf(
             "uTex", "uTexMatrix", "uTexelSize", "uStrength", "uBlockSize",
             "uSigma", "uAmount", "uContrast", "uSaturation",
+            "uMosaicBlock", "uMosaicOffset", "uQuality", "uDebugView", "uHistory", "uHasHistory",
         )
         val locations = names.associateWith { GLES20.glGetUniformLocation(program, it) }
         return ShaderProgram(program, locations)

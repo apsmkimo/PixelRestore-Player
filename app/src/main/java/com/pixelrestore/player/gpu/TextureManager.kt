@@ -10,7 +10,7 @@ internal class TextureManager {
         var height: Int,
     )
 
-    private val fbos = arrayOfNulls<Fbo>(2)
+    private val fbos = arrayOfNulls<Fbo>(4)
     var oesTexture: Int = 0
         private set
 

@@ -66,7 +66,7 @@ class PixelRestoreLogicTest {
         )
         assertEquals(1080, profile.outputHeight)
         assertEquals(60, profile.targetFps)
-        assertTrue(profile.passes.any { it.type == FilterType.SCALE_BICUBIC || it.type == FilterType.SCALE_BILINEAR })
+        assertTrue(profile.passes.any { it.type == FilterType.MOSAIC_RECONSTRUCT })
         assertNull(
             ProcessingProfileResolver.stepDown(
                 settings = settings,
@@ -120,8 +120,10 @@ class PixelRestoreLogicTest {
             maxDimension = 4096,
             adaptation = AutoAdaptation(),
         )
-        assertTrue(mosaic.passes.any { it.type == FilterType.DEBLOCK })
-        assertTrue(mosaic.passes.any { it.type == FilterType.SCALE_BICUBIC })
+        assertTrue(mosaic.passes.any { it.type == FilterType.MOSAIC_RECONSTRUCT })
+        assertTrue(mosaic.passes.any { it.type == FilterType.MOSAIC_TEMPORAL })
+        assertFalse(mosaic.passes.any { it.type == FilterType.DEBLOCK })
+        assertFalse(mosaic.passes.any { it.type == FilterType.EDGE_SMOOTH })
         assertFalse(mosaic.passes.any { it.type == FilterType.DENOISE })
 
         val enhanced = ProcessingProfileResolver.resolve(
@@ -182,7 +184,7 @@ class PixelRestoreLogicTest {
         manager.setBackend(ProcessingBackend.CPU)
         assertEquals("CpuFallbackProcessor", manager.activeProcessorName())
         assertEquals(3, seen.size)
-        assertTrue(seen[0].contains(FilterType.DEBLOCK))
+        assertTrue(seen[0].contains(FilterType.MOSAIC_RECONSTRUCT))
         assertTrue(seen[1].contains(FilterType.CONTRAST))
         assertEquals(listOf(FilterType.BLIT), seen[2])
     }

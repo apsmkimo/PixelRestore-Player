@@ -13,7 +13,9 @@ import androidx.compose.ui.unit.sp
 import com.pixelrestore.player.device.DecoderNaming
 import com.pixelrestore.player.device.FrameTiming
 import com.pixelrestore.player.player.PlaybackState
+import com.pixelrestore.player.processing.MosaicGrid
 import com.pixelrestore.player.processing.ProcessingBackend
+import com.pixelrestore.player.processing.ProcessingMode
 import com.pixelrestore.player.processing.ResolvedProfile
 
 @Composable
@@ -22,6 +24,7 @@ fun DebugOverlay(
     timing: FrameTiming,
     playback: PlaybackState,
     backend: ProcessingBackend,
+    mosaicGrid: MosaicGrid? = null,
     modifier: Modifier = Modifier,
 ) {
     val width = timing.actualWidth.takeIf { it > 0 } ?: profile.outputWidth
@@ -39,7 +42,18 @@ fun DebugOverlay(
         DebugLine("Decoder: ${DecoderNaming.label(playback.decoderName, playback.decoderHardware)}")
         DebugLine("Processing: ${backend.label}")
         DebugLine("Frame time: ${"%.1f".format(timing.frameTimeMs)} ms")
+        DebugLine("GPU time: ${"%.1f".format(if (timing.gpuTimeMs > 0f) timing.gpuTimeMs else timing.frameTimeMs)} ms")
+        DebugLine("Decoder offset: ${"%.1f".format(playback.decoderOffsetMs)} ms")
         DebugLine("Pipeline: $pipeline")
+        if (profile.mode == ProcessingMode.MOSAIC_RESTORATION && mosaicGrid != null) {
+            if (mosaicGrid.usable) {
+                DebugLine("Block: ${mosaicGrid.blockWidth}×${mosaicGrid.blockHeight}")
+                DebugLine("Grid offset: ${mosaicGrid.offsetX}, ${mosaicGrid.offsetY}")
+                DebugLine("Grid confidence: ${"%.2f".format(mosaicGrid.confidence)}")
+            } else {
+                DebugLine("Block: not detected")
+            }
+        }
     }
 }
 

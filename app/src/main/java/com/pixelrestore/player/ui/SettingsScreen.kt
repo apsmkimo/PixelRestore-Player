@@ -33,8 +33,10 @@ import com.pixelrestore.player.R
 import com.pixelrestore.player.device.DeviceCapabilities
 import com.pixelrestore.player.processing.ProcessingMode
 import com.pixelrestore.player.processing.ProcessingProfileResolver
+import com.pixelrestore.player.processing.MosaicDebugView
 import com.pixelrestore.player.settings.EnhancementLevel
 import com.pixelrestore.player.settings.FrameRateOption
+import com.pixelrestore.player.settings.MosaicBlockSize
 import com.pixelrestore.player.settings.MosaicResolution
 import com.pixelrestore.player.settings.OutputResolution
 import com.pixelrestore.player.settings.QualityLevel
@@ -51,6 +53,9 @@ fun SettingsScreen(
     onMosaicResolution: (MosaicResolution) -> Unit,
     onMosaicFrameRate: (FrameRateOption) -> Unit,
     onMosaicQuality: (QualityLevel) -> Unit,
+    onMosaicBlockSize: (MosaicBlockSize) -> Unit,
+    onMosaicDebug: (Boolean) -> Unit,
+    onMosaicDebugView: (MosaicDebugView) -> Unit,
     onEnhancementLevel: (EnhancementLevel) -> Unit,
     onEnhancementResolution: (OutputResolution) -> Unit,
     onNoise: (Strength) -> Unit,
@@ -123,6 +128,38 @@ fun SettingsScreen(
                     label = { it.label },
                     onSelect = onMosaicQuality,
                 )
+                Text(
+                    stringResource(R.string.quality_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OptionRow(
+                    title = stringResource(R.string.block_size),
+                    options = MosaicBlockSize.entries,
+                    selected = settings.mosaicBlockSize,
+                    label = { it.label },
+                    onSelect = onMosaicBlockSize,
+                )
+                Text(
+                    stringResource(R.string.block_size_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SettingSwitch(
+                    title = stringResource(R.string.mosaic_debug),
+                    hint = stringResource(R.string.mosaic_debug_hint),
+                    checked = settings.mosaicDebug,
+                    onChecked = onMosaicDebug,
+                )
+                if (settings.mosaicDebug) {
+                    OptionRow(
+                        title = stringResource(R.string.debug_view),
+                        options = MosaicDebugView.entries,
+                        selected = settings.mosaicDebugView,
+                        label = { it.label },
+                        onSelect = onMosaicDebugView,
+                    )
+                }
             }
 
             if (settings.mode == ProcessingMode.VIDEO_ENHANCEMENT) {

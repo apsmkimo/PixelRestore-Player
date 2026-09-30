@@ -202,29 +202,47 @@ object ProcessingProfileResolver {
         else -> (height * 16f / 9f).roundToInt()
     }
 
+    // SMCPKG_SUPPORT>>>Cursor017
+    // private fun mosaicPasses(quality: QualityLevel, scaling: Boolean, upscaling: Boolean): List<FilterPass> {
+    //     val scale = scalePass(quality != QualityLevel.LOW && upscaling, scaling)
+    //     return when (quality) {
+    //         QualityLevel.LOW -> listOfNotNull(
+    //             FilterPass(FilterType.DEBLOCK, 0.45f, 8f),
+    //             scale,
+    //             FilterPass(FilterType.SHARPEN, 0.20f),
+    //         )
+    //         QualityLevel.MEDIUM -> listOfNotNull(
+    //             FilterPass(FilterType.DEBLOCK, 0.70f, 8f),
+    //             FilterPass(FilterType.EDGE_SMOOTH, 0.65f, 0.08f),
+    //             scale,
+    //             FilterPass(FilterType.SHARPEN, 0.40f),
+    //         )
+    //         QualityLevel.HIGH -> listOfNotNull(
+    //             FilterPass(FilterType.DEBLOCK, 0.85f, 8f),
+    //             FilterPass(FilterType.DEBLOCK, 0.35f, 16f),
+    //             FilterPass(FilterType.EDGE_SMOOTH, 0.80f, 0.05f),
+    //             scale,
+    //             FilterPass(FilterType.SHARPEN, 0.60f),
+    //         )
+    //     }
+    // }
+    @Suppress("UNUSED_PARAMETER")
     private fun mosaicPasses(quality: QualityLevel, scaling: Boolean, upscaling: Boolean): List<FilterPass> {
-        val scale = scalePass(quality != QualityLevel.LOW && upscaling, scaling)
-        return when (quality) {
-            QualityLevel.LOW -> listOfNotNull(
-                FilterPass(FilterType.DEBLOCK, 0.45f, 8f),
-                scale,
-                FilterPass(FilterType.SHARPEN, 0.20f),
-            )
-            QualityLevel.MEDIUM -> listOfNotNull(
-                FilterPass(FilterType.DEBLOCK, 0.70f, 8f),
-                FilterPass(FilterType.EDGE_SMOOTH, 0.65f, 0.08f),
-                scale,
-                FilterPass(FilterType.SHARPEN, 0.40f),
-            )
-            QualityLevel.HIGH -> listOfNotNull(
-                FilterPass(FilterType.DEBLOCK, 0.85f, 8f),
-                FilterPass(FilterType.DEBLOCK, 0.35f, 16f),
-                FilterPass(FilterType.EDGE_SMOOTH, 0.80f, 0.05f),
-                scale,
-                FilterPass(FilterType.SHARPEN, 0.60f),
-            )
+        val level = when (quality) {
+            QualityLevel.LOW -> 0f
+            QualityLevel.MEDIUM -> 1f
+            QualityLevel.HIGH -> 2f
         }
+        // Reconstruction samples the source lattice and writes the output size itself.
+        val passes = mutableListOf(FilterPass(FilterType.MOSAIC_RECONSTRUCT, level))
+        if (quality == QualityLevel.LOW) {
+            passes += FilterPass(FilterType.SHARPEN, 0.22f)
+        } else {
+            passes += FilterPass(FilterType.MOSAIC_TEMPORAL, level)
+        }
+        return passes
     }
+    // SMCPKG_SUPPORT<<<Cursor018
 
     private fun enhancementPasses(
         level: EnhancementLevel,

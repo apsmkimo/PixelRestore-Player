@@ -47,6 +47,8 @@ class MainActivity : ComponentActivity() {
             val pipelineNote by viewModel.pipelineNote.collectAsStateWithLifecycle()
             val cpuFrame by viewModel.cpuFrame.collectAsStateWithLifecycle()
             val capabilities by viewModel.capabilities.collectAsStateWithLifecycle()
+            val mosaicGrid by viewModel.mosaicGrid.collectAsStateWithLifecycle()
+            val compareOriginal by viewModel.compareOriginal.collectAsStateWithLifecycle()
             var showSettings by rememberSaveable { mutableStateOf(false) }
             val context = LocalContext.current
             val picker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -89,6 +91,9 @@ class MainActivity : ComponentActivity() {
                             onMosaicResolution = viewModel::setMosaicResolution,
                             onMosaicFrameRate = viewModel::setMosaicFrameRate,
                             onMosaicQuality = viewModel::setMosaicQuality,
+                            onMosaicBlockSize = viewModel::setMosaicBlockSize,
+                            onMosaicDebug = viewModel::setMosaicDebug,
+                            onMosaicDebugView = viewModel::setMosaicDebugView,
                             onEnhancementLevel = viewModel::setEnhancementLevel,
                             onEnhancementResolution = viewModel::setEnhancementResolution,
                             onNoise = viewModel::setNoiseReduction,
@@ -122,6 +127,9 @@ class MainActivity : ComponentActivity() {
                             onCpuFailed = viewModel::onCpuFailed,
                             processFrame = viewModel::processFrame,
                             processingManager = viewModel.processingManager,
+                            mosaicGrid = mosaicGrid,
+                            compareOriginal = compareOriginal,
+                            onToggleCompare = viewModel::toggleCompareOriginal,
                             modifier = Modifier.padding(padding),
                         )
                     }

@@ -28,6 +28,7 @@ data class PlaybackState(
     val decoderName: String = "",
     val decoderHardware: Boolean? = null,
     val decoderDroppedFrames: Int = 0,
+    val decoderOffsetMs: Float = 0f,
     val error: String? = null,
     val hasMedia: Boolean = false,
 )
@@ -160,6 +161,15 @@ class Media3Player(context: Context) {
             if (fps > 0f) {
                 _state.value = _state.value.copy(frameRate = fps)
             }
+        }
+
+        override fun onVideoFrameProcessingOffset(
+            eventTime: AnalyticsListener.EventTime,
+            totalProcessingOffsetUs: Long,
+            frameCount: Int,
+        ) {
+            if (frameCount <= 0) return
+            _state.value = _state.value.copy(decoderOffsetMs = (totalProcessingOffsetUs / frameCount) / 1000f)
         }
 
         override fun onDroppedVideoFrames(
