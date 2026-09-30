@@ -1,0 +1,99 @@
+# Build debug and unsigned-release APKs.
+#
+# Triggers:
+#   - push of a tag matching v*  (also publishes a GitHub Release)
+#   - Actions tab → Run workflow (workflow_dispatch; artifacts only)
+#
+# This is a small custom workflow instead of alsrb968/action-release-apk.
+# That marketplace action pins JDK 11, tracks @master, expects an extra
+# PAT secret, and does not install compileSdk 37.2 or offer workflow_dispatch.
+#
+# Signing: this repo has no release keystore and no signing secrets.
+#   - debug APK: signed by the runner's ephemeral debug keystore (installable;
+#     the certificate changes on every run)
+#   - release APK: unsigned, named *-release-unsigned.apk
+
+name: Build APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Assemble debug and release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          # cmdline-tools 22.0 (15859902) is the action default. Pin a newer
+          # sdkmanager so platforms;android-37.2 is in the package index.
+          cmdline-tools-version: "16111833"
+          packages: "platform-tools platforms;android-37.2 build-tools;36.0.0"
+
+      - name: Assemble debug and unsigned release
+        run: chmod +x ./gradlew && ./gradlew assembleDebug assembleRelease --stacktrace
+
+      - name: Collect APKs
+        id: apks
+        run: |
+          set -euo pipefail
+          label="${GITHUB_REF_NAME//\//-}"
+          mkdir -p dist
+          debug="dist/PixelRestore-Player-${label}-debug.apk"
+          release="dist/PixelRestore-Player-${label}-release-unsigned.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$debug"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$release"
+          echo "label=${label}" >> "$GITHUB_OUTPUT"
+          ls -lh dist
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixelRestore-Player-${{ steps.apks.outputs.label }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attach APKs to the GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          fail_on_unmatched_files: true
+          body: |
+            PixelRestore Player ${{ github.ref_name }}
+
+            Two APKs are attached:
+
+            - `*-debug.apk` — debug build. GitHub's runner signs it with a
+              throwaway debug keystore, so it installs, but the signature is
+              not stable across runs.
+            - `*-release-unsigned.apk` — release build with minify off and
+              **no release signature**. This repository does not store a
+              keystore or signing secrets. Sign it locally before distributing
+              it as a production build (`apksigner` / Android Studio).
+
+            The same files are also on this workflow run as Actions artifacts.
+          draft: false
+          prerelease: false

@@ -96,6 +96,48 @@ Android Studio: **File → Open** this directory, let Gradle sync, then **Run** 
 
 `local.properties` is gitignored.
 
+## GitHub Actions APK builds
+
+Workflow: [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml).
+
+It runs on `ubuntu-latest` with Temurin JDK 17 and Android command-line tools `16111833`. The job installs `platforms;android-37.2` and `build-tools;36.0.0`, then runs `./gradlew assembleDebug assembleRelease`.
+
+This is a small custom workflow (checkout, JDK, `android-actions/setup-android`, Gradle, upload). The marketplace action [Build and Publish Release APK](https://github.com/marketplace/actions/build-and-publish-release-apk-from-your-android-project) is not used: it tracks `@master`, uses JDK 11, asks for an extra PAT, and does not install compile SDK 37.2 or support manual dispatch.
+
+### What you get
+
+| Build | File | Signature |
+| --- | --- | --- |
+| debug | `PixelRestore-Player-<ref>-debug.apk` | Signed with the runner's ephemeral debug keystore. It installs. The certificate is different on every run. |
+| release | `PixelRestore-Player-<ref>-release-unsigned.apk` | **Unsigned.** There is no release keystore and no signing secret in this repo. Sign it yourself before shipping a production build. |
+
+Both files are uploaded as one Actions artifact named `PixelRestore-Player-<ref>` (kept 14 days). `<ref>` is the tag (`v1.0.0`) or, for a manual run, the branch name.
+
+A **tag push** also creates (or updates) a GitHub Release for that tag and attaches both APKs. The workflow uses the built-in `GITHUB_TOKEN` with `contents: write`. It does not read a personal access token or a keystore secret. A manual run uploads artifacts only and does not publish a Release.
+
+### Create a tag
+
+From a commit you want to ship:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Only tags matching `v*` start the workflow (`v1.0.0`, `v1.0.0-rc1`). The Release page for that tag then lists both APKs under Assets. The same files are on the Actions run.
+
+### Download the artifact
+
+1. Open the **Actions** tab and the **Build APK** workflow.
+2. Open the run for your tag or manual dispatch.
+3. Download **PixelRestore-Player-&lt;ref&gt;** from the Artifacts section.
+
+On a tag run you can also download the APKs from the Release page (**Releases** → the tag → Assets).
+
+### Run it by hand
+
+**Actions → Build APK → Run workflow**, then pick the branch. That is `workflow_dispatch`. It builds the same two APKs and uploads the artifact. It does not create a Release.
+
 ## Supported Android versions
 
 - **minSdk 26** (Android 8.0). Chosen because current devices that can sustain GPU video effects are well above this floor, adaptive icons and scoped-storage-era URI grants are available, and it avoids legacy external-storage permissions. Media3 still runs on older releases; this app does not.
