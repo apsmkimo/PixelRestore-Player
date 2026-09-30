@@ -20,11 +20,14 @@ import com.pixelrestore.player.processing.FrameHandle
 import com.pixelrestore.player.processing.ProcessedFrame
 import com.pixelrestore.player.processing.ProcessingBackend
 import com.pixelrestore.player.processing.ProcessingManager
+import com.pixelrestore.player.processing.MosaicDebugView
+import com.pixelrestore.player.processing.MosaicGrid
 import com.pixelrestore.player.processing.ProcessingMode
 import com.pixelrestore.player.processing.ProcessingProfileResolver
 import com.pixelrestore.player.processing.ResolvedProfile
 import com.pixelrestore.player.settings.EnhancementLevel
 import com.pixelrestore.player.settings.FrameRateOption
+import com.pixelrestore.player.settings.MosaicBlockSize
 import com.pixelrestore.player.settings.MosaicResolution
 import com.pixelrestore.player.settings.OutputResolution
 import com.pixelrestore.player.settings.QualityLevel
@@ -89,6 +92,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _pipelineNote = MutableStateFlow<String?>(null)
     val pipelineNote: StateFlow<String?> = _pipelineNote.asStateFlow()
 
+    private val _mosaicGrid = MutableStateFlow(MosaicGrid.UNDETECTED)
+    val mosaicGrid: StateFlow<MosaicGrid> = _mosaicGrid.asStateFlow()
+
+    private val _compareOriginal = MutableStateFlow(false)
+    val compareOriginal: StateFlow<Boolean> = _compareOriginal.asStateFlow()
+
     private var latestSettings = UserSettings()
     private var adaptation = AutoAdaptation()
     private var activeSurface: Surface? = null
@@ -98,6 +107,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val settingsWrite = Mutex()
 
     init {
+        processingManager.mosaicRuntime.onGrid = { grid -> _mosaicGrid.value = grid }
         viewModelScope.launch(Dispatchers.Default) {
             _capabilities.value = DeviceCapabilityDetector(application).detect()
             resolve()
@@ -234,6 +244,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setMosaicQuality(value: QualityLevel) = edit { it.copy(mosaicQuality = value) }
 
+    fun setMosaicBlockSize(value: MosaicBlockSize) = edit { it.copy(mosaicBlockSize = value) }
+
+    fun setMosaicDebug(enabled: Boolean) = edit { it.copy(mosaicDebug = enabled) }
+
+    fun setMosaicDebugView(value: MosaicDebugView) = edit { it.copy(mosaicDebugView = value) }
+
+    fun toggleCompareOriginal() {
+        val next = !_compareOriginal.value
+        _compareOriginal.value = next
+        processingManager.mosaicRuntime.compareOriginal = next
+    }
+
     fun setEnhancementLevel(value: EnhancementLevel) = edit { it.copy(enhancementLevel = value) }
 
     fun setEnhancementResolution(value: OutputResolution) = edit { it.copy(enhancementResolution = value) }
@@ -281,6 +303,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             adaptation = adaptation,
         )
         _profile.value = resolved
+        processingManager.configureMosaic(latestSettings)
+        processingManager.mosaicRuntime.compareOriginal = _compareOriginal.value
         controller.applyProfile(resolved)
     }
 

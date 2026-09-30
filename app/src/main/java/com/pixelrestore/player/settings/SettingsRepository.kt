@@ -20,6 +20,12 @@ class SettingsRepository(private val context: Context) {
                 mosaicResolution = enumValue(prefs[Keys.MOSAIC_RESOLUTION], MosaicResolution.AUTO),
                 mosaicFrameRate = enumValue(prefs[Keys.MOSAIC_FPS], FrameRateOption.AUTO),
                 mosaicQuality = enumValue(prefs[Keys.MOSAIC_QUALITY], QualityLevel.MEDIUM),
+                mosaicBlockSize = enumValue(prefs[Keys.MOSAIC_BLOCK], MosaicBlockSize.AUTO),
+                mosaicDebug = prefs[Keys.MOSAIC_DEBUG] ?: false,
+                mosaicDebugView = enumValue(
+                    prefs[Keys.MOSAIC_DEBUG_VIEW],
+                    com.pixelrestore.player.processing.MosaicDebugView.FINAL,
+                ),
                 enhancementLevel = enumValue(prefs[Keys.ENHANCE_LEVEL], EnhancementLevel.MEDIUM),
                 enhancementResolution = enumValue(prefs[Keys.ENHANCE_RESOLUTION], OutputResolution.ORIGINAL),
                 noiseReduction = enumValue(prefs[Keys.NOISE], Strength.MEDIUM),
@@ -38,6 +44,12 @@ class SettingsRepository(private val context: Context) {
                     mosaicResolution = enumValue(prefs[Keys.MOSAIC_RESOLUTION], MosaicResolution.AUTO),
                     mosaicFrameRate = enumValue(prefs[Keys.MOSAIC_FPS], FrameRateOption.AUTO),
                     mosaicQuality = enumValue(prefs[Keys.MOSAIC_QUALITY], QualityLevel.MEDIUM),
+                    mosaicBlockSize = enumValue(prefs[Keys.MOSAIC_BLOCK], MosaicBlockSize.AUTO),
+                    mosaicDebug = prefs[Keys.MOSAIC_DEBUG] ?: false,
+                    mosaicDebugView = enumValue(
+                        prefs[Keys.MOSAIC_DEBUG_VIEW],
+                        com.pixelrestore.player.processing.MosaicDebugView.FINAL,
+                    ),
                     enhancementLevel = enumValue(prefs[Keys.ENHANCE_LEVEL], EnhancementLevel.MEDIUM),
                     enhancementResolution = enumValue(prefs[Keys.ENHANCE_RESOLUTION], OutputResolution.ORIGINAL),
                     noiseReduction = enumValue(prefs[Keys.NOISE], Strength.MEDIUM),
@@ -50,6 +62,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.MOSAIC_RESOLUTION] = next.mosaicResolution.name
             prefs[Keys.MOSAIC_FPS] = next.mosaicFrameRate.name
             prefs[Keys.MOSAIC_QUALITY] = next.mosaicQuality.name
+            prefs[Keys.MOSAIC_BLOCK] = next.mosaicBlockSize.name
+            prefs[Keys.MOSAIC_DEBUG] = next.mosaicDebug
+            prefs[Keys.MOSAIC_DEBUG_VIEW] = next.mosaicDebugView.name
             prefs[Keys.ENHANCE_LEVEL] = next.enhancementLevel.name
             prefs[Keys.ENHANCE_RESOLUTION] = next.enhancementResolution.name
             prefs[Keys.NOISE] = next.noiseReduction.name
@@ -68,6 +83,9 @@ class SettingsRepository(private val context: Context) {
         val MOSAIC_RESOLUTION = stringPreferencesKey("mosaic_resolution")
         val MOSAIC_FPS = stringPreferencesKey("mosaic_fps")
         val MOSAIC_QUALITY = stringPreferencesKey("mosaic_quality")
+        val MOSAIC_BLOCK = stringPreferencesKey("mosaic_block")
+        val MOSAIC_DEBUG = booleanPreferencesKey("mosaic_debug")
+        val MOSAIC_DEBUG_VIEW = stringPreferencesKey("mosaic_debug_view")
         val ENHANCE_LEVEL = stringPreferencesKey("enhance_level")
         val ENHANCE_RESOLUTION = stringPreferencesKey("enhance_resolution")
         val NOISE = stringPreferencesKey("noise")

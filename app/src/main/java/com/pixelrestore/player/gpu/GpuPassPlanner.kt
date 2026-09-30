@@ -41,7 +41,12 @@ internal object GpuPassPlanner {
         var currentH = srcH
         val passes = ArrayList<GpuPass>(planned.size)
         planned.forEachIndexed { index, filter ->
-            val scaling = filter.type == FilterType.SCALE_BILINEAR || filter.type == FilterType.SCALE_BICUBIC
+            // SMCPKG_SUPPORT>>>Cursor019
+            // val scaling = filter.type == FilterType.SCALE_BILINEAR || filter.type == FilterType.SCALE_BICUBIC
+            val scaling = filter.type == FilterType.SCALE_BILINEAR ||
+                filter.type == FilterType.SCALE_BICUBIC ||
+                filter.type == FilterType.MOSAIC_RECONSTRUCT
+            // SMCPKG_SUPPORT<<<Cursor020
             val outW = if (scaling) dstW else currentW
             val outH = if (scaling) dstH else currentH
             passes += GpuPass(

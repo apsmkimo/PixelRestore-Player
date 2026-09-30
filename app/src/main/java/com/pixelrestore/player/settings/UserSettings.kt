@@ -20,6 +20,15 @@ enum class QualityLevel(val label: String) {
     HIGH("High"),
 }
 
+enum class MosaicBlockSize(val label: String) {
+    AUTO("Auto"),
+    B2("2×2"),
+    B4("4×4"),
+    B8("8×8"),
+    B16("16×16"),
+    B32("32×32"),
+}
+
 enum class EnhancementLevel(val label: String) {
     LOW("Low"),
     MEDIUM("Medium"),
@@ -45,6 +54,10 @@ data class UserSettings(
     val mosaicResolution: MosaicResolution = MosaicResolution.AUTO,
     val mosaicFrameRate: FrameRateOption = FrameRateOption.AUTO,
     val mosaicQuality: QualityLevel = QualityLevel.MEDIUM,
+    val mosaicBlockSize: MosaicBlockSize = MosaicBlockSize.AUTO,
+    val mosaicDebug: Boolean = false,
+    val mosaicDebugView: com.pixelrestore.player.processing.MosaicDebugView =
+        com.pixelrestore.player.processing.MosaicDebugView.FINAL,
     val enhancementLevel: EnhancementLevel = EnhancementLevel.MEDIUM,
     val enhancementResolution: OutputResolution = OutputResolution.ORIGINAL,
     val noiseReduction: Strength = Strength.MEDIUM,

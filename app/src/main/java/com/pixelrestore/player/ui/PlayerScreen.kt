@@ -43,6 +43,7 @@ import com.pixelrestore.player.device.FrameTiming
 import com.pixelrestore.player.gpu.VideoProcessingView
 import com.pixelrestore.player.player.CpuVideoOutput
 import com.pixelrestore.player.player.PlaybackState
+import com.pixelrestore.player.processing.MosaicGrid
 import com.pixelrestore.player.processing.ProcessingBackend
 import com.pixelrestore.player.processing.ProcessingMode
 import com.pixelrestore.player.processing.ProcessingProfileResolver
@@ -75,6 +76,9 @@ fun PlayerScreen(
     onCpuFailed: (String) -> Unit,
     processFrame: (com.pixelrestore.player.processing.FrameHandle) -> com.pixelrestore.player.processing.ProcessedFrame,
     processingManager: com.pixelrestore.player.processing.ProcessingManager,
+    mosaicGrid: MosaicGrid,
+    compareOriginal: Boolean,
+    onToggleCompare: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -130,12 +134,13 @@ fun PlayerScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-            if (settings.debugOverlay) {
+            if (settings.debugOverlay || (settings.mosaicDebug && settings.mode == ProcessingMode.MOSAIC_RESTORATION)) {
                 DebugOverlay(
                     profile = profile,
                     timing = timing,
                     playback = playback,
                     backend = backend,
+                    mosaicGrid = mosaicGrid,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp),
@@ -144,7 +149,7 @@ fun PlayerScreen(
         }
 
         Text(
-            text = statusLine(profile, backend),
+            text = statusLine(profile, backend, mosaicGrid),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -181,6 +186,11 @@ fun PlayerScreen(
                     imageVector = if (playback.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = stringResource(if (playback.isPlaying) R.string.pause else R.string.play),
                 )
+            }
+            if (settings.mode == ProcessingMode.MOSAIC_RESTORATION) {
+                Button(onClick = onToggleCompare) {
+                    Text(text = stringResource(if (compareOriginal) R.string.compare_processed else R.string.compare_original))
+                }
             }
             Button(onClick = onPickVideo) {
                 Icon(Icons.Filled.VideoLibrary, contentDescription = null)
@@ -305,9 +315,17 @@ private fun SeekRow(
     }
 }
 
-private fun statusLine(profile: ResolvedProfile, backend: ProcessingBackend): String {
+private fun statusLine(profile: ResolvedProfile, backend: ProcessingBackend, mosaicGrid: MosaicGrid): String {
     val mode = when (profile.mode) {
         ProcessingMode.OFF -> "Off"
+        ProcessingMode.MOSAIC_RESTORATION -> {
+            val grid = if (mosaicGrid.usable) {
+                "${mosaicGrid.blockWidth}×${mosaicGrid.blockHeight} @ ${mosaicGrid.offsetX},${mosaicGrid.offsetY}"
+            } else {
+                "grid not detected"
+            }
+            "Mosaic Reconstruction ($grid)"
+        }
         else -> backend.label
     }
     val size = if (profile.outputWidth > 0 && profile.outputHeight > 0) {

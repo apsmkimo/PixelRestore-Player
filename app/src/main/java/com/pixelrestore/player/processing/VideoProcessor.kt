@@ -40,6 +40,8 @@ interface FrameSink {
         outputWidth: Int,
         outputHeight: Int,
     ): ProcessedFrame
+
+    fun bindMosaic(runtime: MosaicRuntime) {}
 }
 
 interface VideoProcessor {

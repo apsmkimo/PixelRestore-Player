@@ -2,7 +2,10 @@ package com.pixelrestore.player.processing
 
 enum class ProcessingMode(val label: String) {
     OFF("Off"),
-    MOSAIC_RESTORATION("Mosaic Restoration"),
+    // SMCPKG_SUPPORT>>>Cursor015
+    // MOSAIC_RESTORATION("Mosaic Restoration"),
+    MOSAIC_RESTORATION("Mosaic Reconstruction"),
+    // SMCPKG_SUPPORT<<<Cursor016
     VIDEO_ENHANCEMENT("Video Enhancement"),
 }
 

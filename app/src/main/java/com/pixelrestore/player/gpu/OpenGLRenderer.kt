@@ -12,6 +12,7 @@ import com.pixelrestore.player.device.PerformanceTracker
 import com.pixelrestore.player.processing.FilterPass
 import com.pixelrestore.player.processing.FrameHandle
 import com.pixelrestore.player.processing.FrameSink
+import com.pixelrestore.player.processing.MosaicRuntime
 import com.pixelrestore.player.processing.ProcessedFrame
 import com.pixelrestore.player.processing.ProcessingBackend
 import java.nio.ByteBuffer
@@ -63,6 +64,12 @@ internal class OpenGLRenderer(
     private var lastTimingPost = 0L
     private var released = false
     private var fatalSent = false
+    private var mosaic: MosaicRuntime? = null
+    private var frameSerial = 0
+    private var historyTexture = 0
+    private var historyReady = false
+    private val readBuffer: ByteBuffer = ByteBuffer.allocateDirect(DETECT_W * DETECT_H * 4)
+        .order(ByteOrder.nativeOrder())
 
     fun init(window: SurfaceTexture, width: Int, height: Int): Boolean {
         viewWidth = width.coerceAtLeast(1)
@@ -154,6 +161,10 @@ internal class OpenGLRenderer(
         return listOf(copy) + planned
     }
 
+    override fun bindMosaic(runtime: MosaicRuntime) {
+        mosaic = runtime
+    }
+
     var drawCallback: ((FrameHandle.Gpu, Int) -> Unit)? = null
     private var pendingFrame: FrameHandle.Gpu? = null
     private var pendingDropped = 0
@@ -167,11 +178,17 @@ internal class OpenGLRenderer(
         val start = System.nanoTime()
         val sourceW = if (frame.sourceWidth > 1) frame.sourceWidth else outputWidth.coerceAtLeast(2)
         val sourceH = if (frame.sourceHeight > 1) frame.sourceHeight else outputHeight.coerceAtLeast(2)
-        val planned = normalizePasses(
+        var planned = normalizePasses(
             GpuPassPlanner.plan(passes, sourceW, sourceH, outputWidth, outputHeight),
             sourceW,
             sourceH,
         )
+        if (mosaic?.showsFinal() == false) {
+            val kept = planned.filter { it.kind != ShaderKind.MOSAIC_TEMPORAL && it.kind != ShaderKind.SHARPEN }
+            if (kept.isNotEmpty()) {
+                planned = kept.dropLast(1) + kept.last().copy(toScreen = true)
+            }
+        }
         drawPasses(frame, planned, sourceW, sourceH)
         egl.setPresentationTime(windowSurface, frame.presentationTimeNs)
         egl.swap(windowSurface)
@@ -225,7 +242,13 @@ internal class OpenGLRenderer(
         var readW = sourceW
         var readH = sourceH
         var writeSlot = 0
+        var spatialTexture = 0
+        var spatialW = 0
+        var spatialH = 0
         for (pass in passes) {
+            if (!readExternal && pass.kind == ShaderKind.MOSAIC_SPATIAL) {
+                maybeDetect(readTexture, readW, readH)
+            }
             val program = shaders.program(pass.kind, readExternal)
             if (program == null) continue
             if (!shaders.has(pass.kind, readExternal) && pass.kind != ShaderKind.BLIT) {
@@ -249,6 +272,11 @@ internal class OpenGLRenderer(
                 readTexture = fbo.texture
                 readW = fbo.width
                 readH = fbo.height
+                if (pass.kind == ShaderKind.MOSAIC_SPATIAL) {
+                    spatialTexture = fbo.texture
+                    spatialW = fbo.width
+                    spatialH = fbo.height
+                }
                 continue
             }
             drawQuad(
@@ -260,6 +288,9 @@ internal class OpenGLRenderer(
                 readH,
                 pass,
             )
+        }
+        if (spatialTexture != 0) {
+            copyToHistory(spatialTexture, spatialW, spatialH)
         }
     }
 
@@ -292,10 +323,29 @@ internal class OpenGLRenderer(
         uniform(program, "uBlockSize", if (pass.secondary > 1f) pass.secondary else 8f)
         uniform(program, "uContrast", pass.strength)
         uniform(program, "uSaturation", if (pass.secondary > 0f) pass.secondary else 1f)
+        val grid = mosaic?.grid
+        val blockLoc = program.uniform("uMosaicBlock")
+        if (blockLoc >= 0) {
+            GLES20.glUniform2f(blockLoc, grid?.blockWidth?.toFloat() ?: 0f, grid?.blockHeight?.toFloat() ?: 0f)
+        }
+        val offsetLoc = program.uniform("uMosaicOffset")
+        if (offsetLoc >= 0) {
+            GLES20.glUniform2f(offsetLoc, grid?.offsetX?.toFloat() ?: 0f, grid?.offsetY?.toFloat() ?: 0f)
+        }
+        uniform(program, "uQuality", pass.strength)
+        uniform(program, "uDebugView", mosaic?.shaderDebugView() ?: 0f)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(target, textureId)
         val sampler = program.uniform("uTex")
         if (sampler >= 0) GLES20.glUniform1i(sampler, 0)
+        if (pass.kind == ShaderKind.MOSAIC_TEMPORAL) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, historyTexture)
+            val history = program.uniform("uHistory")
+            if (history >= 0) GLES20.glUniform1i(history, 1)
+            uniform(program, "uHasHistory", if (historyReady && historyTexture != 0) 1f else 0f)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        }
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(position)
         GLES20.glDisableVertexAttribArray(texCoord)
@@ -329,6 +379,82 @@ internal class OpenGLRenderer(
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
     }
 
+    private fun maybeDetect(textureId: Int, sourceW: Int, sourceH: Int) {
+        val runtime = mosaic ?: return
+        frameSerial += 1
+        if (frameSerial % 12 != 1 || sourceW < 8 || sourceH < 8) return
+        val cropW = sourceW.coerceAtMost(DETECT_W)
+        val cropH = sourceH.coerceAtMost(DETECT_H)
+        val cropX = ((sourceW - cropW) / 2).coerceAtLeast(0)
+        val cropY = ((sourceH - cropH) / 2).coerceAtLeast(0)
+        val program = shaders.program(ShaderKind.BLIT, external = false) ?: return
+        val fbo = textures.fbo(3, cropW, cropH)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.framebuffer)
+        GLES20.glViewport(0, 0, cropW, cropH)
+        val u0 = cropX.toFloat() / sourceW.toFloat()
+        val u1 = (cropX + cropW).toFloat() / sourceW.toFloat()
+        val vTop = 1f - cropY.toFloat() / sourceH.toFloat()
+        val vBottom = 1f - (cropY + cropH).toFloat() / sourceH.toFloat()
+        drawCrop(program, textureId, sourceW, sourceH, u0, u1, vBottom, vTop)
+        readBuffer.position(0)
+        GLES20.glReadPixels(0, 0, cropW, cropH, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, readBuffer)
+        val argb = IntArray(cropW * cropH)
+        for (y in 0 until cropH) {
+            val srcRow = cropH - 1 - y
+            for (x in 0 until cropW) {
+                val packed = (srcRow * cropW + x) * 4
+                val r = readBuffer.get(packed).toInt() and 0xFF
+                val g = readBuffer.get(packed + 1).toInt() and 0xFF
+                val b = readBuffer.get(packed + 2).toInt() and 0xFF
+                argb[y * cropW + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
+        runtime.observeCrop(argb, cropW, cropH, cropX, cropY)
+    }
+
+    private fun drawCrop(
+        program: ShaderProgram,
+        textureId: Int,
+        sourceW: Int,
+        sourceH: Int,
+        u0: Float,
+        u1: Float,
+        v0: Float,
+        v1: Float,
+    ) {
+        val data = floatArrayOf(
+            -1f, -1f, 0f, u0, v0,
+            1f, -1f, 0f, u1, v0,
+            -1f, 1f, 0f, u0, v1,
+            1f, 1f, 0f, u1, v1,
+        )
+        quad.position(0)
+        quad.put(data)
+        quad.position(0)
+        drawQuad(program, GLES20.GL_TEXTURE_2D, textureId, identity, sourceW, sourceH, GpuPass(ShaderKind.BLIT, sourceW, sourceH, 1f, 0f, false))
+        quad.position(0)
+        quad.put(
+            floatArrayOf(
+                -1f, -1f, 0f, 0f, 0f,
+                1f, -1f, 0f, 1f, 0f,
+                -1f, 1f, 0f, 0f, 1f,
+                1f, 1f, 0f, 1f, 1f,
+            ),
+        )
+        quad.position(0)
+    }
+
+    private fun copyToHistory(textureId: Int, width: Int, height: Int) {
+        val program = shaders.program(ShaderKind.BLIT, external = false) ?: return
+        val fbo = textures.fbo(2, width.coerceAtLeast(2), height.coerceAtLeast(2))
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo.framebuffer)
+        GLES20.glViewport(0, 0, fbo.width, fbo.height)
+        drawQuad(program, GLES20.GL_TEXTURE_2D, textureId, identity, width, height, GpuPass(ShaderKind.BLIT, width, height, 1f, 0f, false))
+        historyTexture = fbo.texture
+        historyReady = true
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+    }
+
     private fun droppedSince(pts: Long): Int {
         if (lastPts == 0L || pts <= lastPts) return 0
         val fps = sourceFps().takeIf { it > 1f } ?: targetFps().toFloat()
@@ -343,5 +469,7 @@ internal class OpenGLRenderer(
     companion object {
         private const val TAG = "PixelRestore"
         private const val STRIDE = 5 * 4
+        private const val DETECT_W = 192
+        private const val DETECT_H = 108
     }
 }

@@ -10,6 +10,7 @@ internal abstract class ConfiguredProcessor(
     @Volatile var outputHeight: Int = 0
     var releaseCount: Int = 0
         private set
+    var mosaicRuntime: MosaicRuntime? = null
     private var active = false
 
     fun apply(profile: ResolvedProfile) {
@@ -37,7 +38,14 @@ internal abstract class ConfiguredProcessor(
             is FrameHandle.Gpu -> sink?.render(frame, passes, outputWidth, outputHeight)
                 ?: ProcessedFrame(backend, frame.sourceWidth, frame.sourceHeight)
             is FrameHandle.Cpu -> {
-                val pixels = CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
+                // SMCPKG_SUPPORT>>>Cursor021
+                // val pixels = CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
+                val pixels = if (passes.any { it.type == FilterType.MOSAIC_RECONSTRUCT } && mosaicRuntime != null) {
+                    mosaicRuntime!!.processCpu(frame.pixels, frame.width, frame.height)
+                } else {
+                    CpuPixelFilters.apply(frame.pixels, frame.width, frame.height, passes)
+                }
+                // SMCPKG_SUPPORT<<<Cursor022
                 ProcessedFrame(ProcessingBackend.CPU, frame.width, frame.height, pixels)
             }
         }
@@ -70,6 +78,7 @@ internal class CpuFallbackProcessor : ConfiguredProcessor("CpuFallbackProcessor"
  * Keeps a single processor initialized. Switching mode or backend releases the previous one.
  */
 class ProcessingManager {
+    val mosaicRuntime: MosaicRuntime = MosaicRuntime()
     private val passthrough = PassthroughProcessor()
     private val mosaic = MosaicRestorationProcessor()
     private val enhancement = VideoEnhancementProcessor()
@@ -86,7 +95,14 @@ class ProcessingManager {
             passthrough.sink = sink
             mosaic.sink = sink
             enhancement.sink = sink
+            sink.bindMosaic(mosaicRuntime)
+            mosaic.mosaicRuntime = mosaicRuntime
+            cpu.mosaicRuntime = mosaicRuntime
         }
+    }
+
+    fun configureMosaic(settings: com.pixelrestore.player.settings.UserSettings) {
+        mosaicRuntime.configure(settings)
     }
 
     fun applyProfile(profile: ResolvedProfile) {
