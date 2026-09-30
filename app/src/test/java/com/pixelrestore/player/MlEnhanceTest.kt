@@ -95,8 +95,16 @@ class MlEnhanceTest {
         val inside = output[24 * width + 24]
         assertTrue(((inside shr 16) and 0xFF) > 200)
         assertTrue(runtime.grid.note.contains("SESR-M5"))
-        val unchanged = MosaicRuntime().processMl(frame, width, height)
-        assertTrue(unchanged.contentEquals(frame))
+        val plain = MosaicRuntime()
+        plain.processMl(frame, width, height)
+        assertTrue(plain.grid.note.contains("mosaic reconstruction"))
+        val broken = MosaicRuntime()
+        broken.manualBlock = block
+        broken.tileEnhancer = TileEnhancer { throw IllegalStateException("boom") }
+        broken.processMl(frame, width, height)
+        assertTrue(broken.grid.note.contains("IllegalStateException"))
+        val empty = MosaicRuntime().processMl(IntArray(0), 0, 0)
+        assertEquals(0, empty.size)
         assertTrue(runtime.roi != null)
     }
 

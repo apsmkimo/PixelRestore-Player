@@ -106,11 +106,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var settingsSeeded = false
     // SMCPKG_SUPPORT>>>Cursor067
     private var gpuUnavailableReason: String? = null
+    // SMCPKG_SUPPORT>>>Cursor097
+    private var mlCpuBlocked = false
+    // SMCPKG_SUPPORT<<<Cursor098
     // SMCPKG_SUPPORT<<<Cursor068
     private val settingsWrite = Mutex()
 
     init {
-        processingManager.mosaicRuntime.onGrid = { grid -> _mosaicGrid.value = grid }
+        processingManager.mosaicRuntime.onGrid = { grid ->
+            _mosaicGrid.value = grid
+            // SMCPKG_SUPPORT>>>Cursor099
+            if (latestSettings.mode == ProcessingMode.ML_ENHANCE && grid.note.isNotBlank()) {
+                _pipelineNote.value = grid.note
+            }
+            // SMCPKG_SUPPORT<<<Cursor100
+        }
         // SMCPKG_SUPPORT>>>Cursor069
         try {
             processingManager.mosaicRuntime.tileEnhancer =
@@ -250,7 +260,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onCpuFailed(message: String) {
-        _pipelineNote.value = "CPU fallback failed: $message"
+        // SMCPKG_SUPPORT>>>Cursor101
+        // _pipelineNote.value = "CPU fallback failed: $message"
+        if (latestSettings.mode == ProcessingMode.ML_ENHANCE) {
+            mlCpuBlocked = true
+            _pipelineNote.value = "SESR-M5 stopped ($message). Playback stays on the GPU picture."
+            if (gpuUnavailableReason == null) {
+                _backend.value = ProcessingBackend.GPU
+                processingManager.setBackend(ProcessingBackend.GPU)
+            }
+        } else {
+            _pipelineNote.value = "CPU fallback failed: $message"
+        }
+        // SMCPKG_SUPPORT<<<Cursor102
     }
 
     fun processFrame(frame: FrameHandle): ProcessedFrame = processingManager.process(frame)
@@ -327,7 +349,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         controller.applyProfile(resolved)
         // SMCPKG_SUPPORT>>>Cursor073
         val ml = latestSettings.mode == ProcessingMode.ML_ENHANCE
-        val backend = if (gpuUnavailableReason != null || ml) {
+        // SMCPKG_SUPPORT>>>Cursor103
+        // val backend = if (gpuUnavailableReason != null || ml) {
+        val backend = if (gpuUnavailableReason != null || (ml && !mlCpuBlocked)) {
+        // SMCPKG_SUPPORT<<<Cursor104
             ProcessingBackend.CPU
         } else {
             ProcessingBackend.GPU

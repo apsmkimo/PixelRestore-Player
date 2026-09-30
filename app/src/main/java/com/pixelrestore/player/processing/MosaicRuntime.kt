@@ -138,32 +138,57 @@ class MosaicRuntime {
      * Without a loaded model the frame is unchanged and [MosaicGrid.note] says so.
      */
     fun processMl(pixels: IntArray, width: Int, height: Int): IntArray {
+        // SMCPKG_SUPPORT>>>Cursor091
+        if (width < 2 || height < 2 || pixels.size < width * height) {
+            publishNote("SESR-M5 skipped (empty frame).")
+            return pixels.copyOf()
+        }
         if (compareOriginal) {
             observeCenter(pixels, width, height)
             return pixels.copyOf()
         }
-        observeCenter(pixels, width, height)
-        val region = if (grid.usable) {
-            RoiExtractor.mosaicRegion(pixels, width, height, grid) ?: RoiBox(0, 0, width, height)
-        } else {
-            RoiBox(0, 0, width, height)
+        return try {
+            observeCenter(pixels, width, height)
+            val region = if (grid.usable) {
+                RoiExtractor.mosaicRegion(pixels, width, height, grid) ?: RoiBox(0, 0, width, height)
+            } else {
+                RoiBox(0, 0, width, height)
+            }
+            val tracked = roiTracker.update(region)
+            roi = tracked
+            val box = tracked
+            val enhancer = tileEnhancer
+            if (enhancer == null || box == null || box.width < 2 || box.height < 2) {
+                return classicalFallback("SESR-M5 is not loaded. Using mosaic reconstruction.", pixels, width, height)
+            }
+            SesrTiles.packRgbNchw(pixels, width, height, box, sesrInput)
+            val enhanced = enhancer.enhance(sesrInput)
+            if (enhanced == null) {
+                val why = (enhancer as? SesrEnhancer)?.status ?: "SESR-M5 did not run"
+                return classicalFallback("$why. Using mosaic reconstruction.", pixels, width, height)
+            }
+            val blended = SesrTiles.blend(pixels, width, height, box, enhanced)
+            publishNote("SESR-M5 2× estimate on ${box.width}×${box.height}. Not the original pixels.")
+            blended
+        } catch (error: Throwable) {
+            classicalFallback(
+                "SESR-M5 failed (${error.javaClass.simpleName}). Using mosaic reconstruction.",
+                pixels,
+                width,
+                height,
+            )
         }
-        val tracked = roiTracker.update(region)
-        roi = tracked
-        val box = tracked ?: return pixels.copyOf()
-        val enhancer = tileEnhancer
-        if (enhancer == null) {
-            publishNote("SESR-M5 is not loaded. Showing the original frame.")
-            return pixels.copyOf()
+        // SMCPKG_SUPPORT<<<Cursor092
+    }
+
+    private fun classicalFallback(message: String, pixels: IntArray, width: Int, height: Int): IntArray {
+        val restored = try {
+            processCpu(pixels, width, height)
+        } catch (_: Throwable) {
+            pixels.copyOf()
         }
-        SesrTiles.packRgbNchw(pixels, width, height, box, sesrInput)
-        val enhanced = enhancer.enhance(sesrInput)
-        if (enhanced == null) {
-            publishNote("SESR-M5 did not run. Showing the original frame.")
-            return pixels.copyOf()
-        }
-        publishNote("SESR-M5 2× estimate on ${box.width}×${box.height}. Not the original pixels.")
-        return SesrTiles.blend(pixels, width, height, box, enhanced)
+        publishNote(message)
+        return restored
     }
 
     private fun observeCenter(pixels: IntArray, width: Int, height: Int) {

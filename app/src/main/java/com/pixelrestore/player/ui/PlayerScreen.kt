@@ -291,8 +291,24 @@ private fun CpuSurface(
             onFailed = onCpuFailed,
             budgetMs = { budgetHolder.floatValue },
         )
-        val surface = output.start(width, height)
-        onAttachSurface(surface)
+        // SMCPKG_SUPPORT>>>Cursor095
+        // val surface = output.start(width, height)
+        // onAttachSurface(surface)
+        val surface = try {
+            output.start(width, height)
+        } catch (error: Throwable) {
+            onCpuFailed(error.javaClass.simpleName + ": " + (error.message ?: "CPU output failed"))
+            output.release()
+            return@DisposableEffect onDispose { }
+        }
+        try {
+            onAttachSurface(surface)
+        } catch (error: Throwable) {
+            onCpuFailed(error.javaClass.simpleName + ": " + (error.message ?: "CPU surface failed"))
+            output.release()
+            return@DisposableEffect onDispose { }
+        }
+        // SMCPKG_SUPPORT<<<Cursor096
         onDispose {
             onDetachSurface(surface)
             output.release()
