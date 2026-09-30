@@ -1,0 +1,25 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+# SMCPKG_SUPPORT>>>Cursor013
+# /build/
+build/
+# SMCPKG_SUPPORT<<<Cursor014
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.ap_
+*.aab
+output.json
+.navigation/
+
+# Keystores — never commit signing keys
+*.jks
+*.keystore
+
+# Android Studio
+*.hprof
+.kotlin/

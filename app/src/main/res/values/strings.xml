@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PixelRestore Player</string>
+    <string name="tagline">Local GPU Video Restoration Player</string>
+    <string name="pick_video">Pick video</string>
+    <string name="settings">Settings</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="back">Back</string>
+    <string name="empty_video">Pick one local video to play</string>
+    <string name="processing_mode">Processing Mode</string>
+    <string name="mosaic_section">Mosaic Restoration</string>
+    <string name="enhancement_section">Video Enhancement</string>
+    <string name="performance_section">Performance</string>
+    <string name="about_section">About</string>
+    <string name="resolution">Resolution</string>
+    <string name="frame_rate">Frame Rate</string>
+    <string name="quality">Quality</string>
+    <string name="enhancement_level">Enhancement Level</string>
+    <string name="output_resolution">Output resolution</string>
+    <string name="noise_reduction">Noise reduction</string>
+    <string name="sharpening">Sharpening</string>
+    <string name="auto_optimization">Auto Optimization</string>
+    <string name="auto_optimization_hint">When resolution or frame rate is Auto, follow this device\'s recommended tier. Manual choices are never overwritten.</string>
+    <string name="debug_overlay">Debug Overlay</string>
+    <string name="debug_overlay_hint">Shows resolution, FPS, dropped frames, decoder, and frame time. Default off.</string>
+    <string name="privacy_title">Privacy</string>
+    <string name="privacy_body">All playback and processing happen on this device. PixelRestore Player does not upload videos, does not use cloud processing, remote inference, or AI APIs, and does not include analytics or tracking. The app does not request Internet access.</string>
+    <string name="mosaic_disclaimer">Mosaic Restoration is mosaic artifact reduction / visual restoration. It smooths block edges and can upscale. It does not recover pixels that were permanently discarded by the original encode.</string>
+    <string name="no_ai">This app does not use AI or machine-learning models.</string>
+    <string name="video_surface">Video playback surface</string>
+    <string name="seek">Seek</string>
+</resources>
