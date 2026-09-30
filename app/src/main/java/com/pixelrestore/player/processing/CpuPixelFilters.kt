@@ -21,6 +21,10 @@ object CpuPixelFilters {
                 FilterType.SCALE_BILINEAR, FilterType.SCALE_BICUBIC, FilterType.BLIT -> current
                 // Mosaic reconstruction is applied by MosaicRuntime before this loop.
                 FilterType.MOSAIC_RECONSTRUCT, FilterType.MOSAIC_TEMPORAL -> current
+                // SMCPKG_SUPPORT>>>Cursor083
+                // SESR runs in MosaicRuntime.processMl, not in this integer filter loop.
+                FilterType.ML_ENHANCE -> current
+                // SMCPKG_SUPPORT<<<Cursor084
             }
         }
         return current

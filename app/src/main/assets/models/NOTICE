@@ -1,0 +1,22 @@
+SESR-M5 INT8 (sesr_m5_int8.onnx)
+
+This file is the published NCHW INT8 ONNX graph from
+https://huggingface.co/amd/ryzenai-sesr (sesr_nchw_int8.onnx),
+Apache License 2.0. See LICENSE-SESR-Apache-2.0.txt.
+
+The graph is fixed:
+  input  Model::input_0  float32 NCHW 1x3x512x512  (about 0..255)
+  output 254             float32 NCHW 1x3x1024x1024 (2x)
+
+The model card also mentions 256x256 training tiles. This packaged
+graph does not accept a 256 input. PixelRestore resamples one ROI
+to 512x512, runs the 2x network, and blends the result back.
+It estimates detail. It does not recover the original pixels.
+
+Inference is on-device with ONNX Runtime (CPU execution provider).
+The app does not download weights at runtime.
+
+SESR was introduced in "Collapsible Linear Blocks for Super-Efficient
+Super Resolution" (Bhardwaj et al., arXiv:2103.09404). The AMD Ryzen AI
+export is a quantized ONNX build of that family. Do not assume an AMD
+NPU is present on Android.

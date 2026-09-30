@@ -162,6 +162,34 @@ fun SettingsScreen(
                 }
             }
 
+            // SMCPKG_SUPPORT>>>Cursor061
+            if (settings.mode == ProcessingMode.ML_ENHANCE) {
+                HorizontalDivider()
+                Text(stringResource(R.string.ml_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.ml_disclaimer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.block_size),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(R.string.block_size_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OptionRow(
+                    title = stringResource(R.string.block_size),
+                    options = MosaicBlockSize.entries,
+                    selected = settings.mosaicBlockSize,
+                    label = { it.label },
+                    onSelect = onMosaicBlockSize,
+                )
+            }
+            // SMCPKG_SUPPORT<<<Cursor062
+
             if (settings.mode == ProcessingMode.VIDEO_ENHANCEMENT) {
                 HorizontalDivider()
                 Text(stringResource(R.string.enhancement_section), style = MaterialTheme.typography.titleMedium)

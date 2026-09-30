@@ -7,6 +7,9 @@ enum class ProcessingMode(val label: String) {
     MOSAIC_RESTORATION("Mosaic Reconstruction"),
     // SMCPKG_SUPPORT<<<Cursor016
     VIDEO_ENHANCEMENT("Video Enhancement"),
+    // SMCPKG_SUPPORT>>>Cursor033
+    ML_ENHANCE("ML Enhance (SESR)"),
+    // SMCPKG_SUPPORT<<<Cursor034
 }
 
 enum class ProcessingBackend(val label: String) {

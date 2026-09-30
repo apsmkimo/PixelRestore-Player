@@ -22,6 +22,13 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0.0"
+        // SMCPKG_SUPPORT>>>Cursor085
+        // ONNX Runtime ships a .so per ABI. Phone + 64-bit emulator only;
+        // the model file itself stays about 120 KB.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+        // SMCPKG_SUPPORT<<<Cursor086
     }
 
     buildTypes {
@@ -50,6 +57,12 @@ android {
         }
     }
 
+    // SMCPKG_SUPPORT>>>Cursor079
+    androidResources {
+        noCompress += "onnx"
+    }
+    // SMCPKG_SUPPORT<<<Cursor080
+
     testOptions {
         unitTests.isIncludeAndroidResources = false
     }
@@ -71,6 +84,9 @@ dependencies {
     implementation(libs.androidx.datastore)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.media3.exoplayer)
+    // SMCPKG_SUPPORT>>>Cursor081
+    implementation(libs.onnxruntime.android)
+    // SMCPKG_SUPPORT<<<Cursor082
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

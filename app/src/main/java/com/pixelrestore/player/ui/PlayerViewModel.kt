@@ -104,10 +104,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var adaptedForThisOverrun = false
     private var resumeOnStart = false
     private var settingsSeeded = false
+    // SMCPKG_SUPPORT>>>Cursor067
+    private var gpuUnavailableReason: String? = null
+    // SMCPKG_SUPPORT>>>Cursor097
+    private var mlCpuBlocked = false
+    // SMCPKG_SUPPORT<<<Cursor098
+    // SMCPKG_SUPPORT<<<Cursor068
     private val settingsWrite = Mutex()
 
     init {
-        processingManager.mosaicRuntime.onGrid = { grid -> _mosaicGrid.value = grid }
+        processingManager.mosaicRuntime.onGrid = { grid ->
+            _mosaicGrid.value = grid
+            // SMCPKG_SUPPORT>>>Cursor099
+            if (latestSettings.mode == ProcessingMode.ML_ENHANCE && grid.note.isNotBlank()) {
+                _pipelineNote.value = grid.note
+            }
+            // SMCPKG_SUPPORT<<<Cursor100
+        }
+        // SMCPKG_SUPPORT>>>Cursor069
+        try {
+            processingManager.mosaicRuntime.tileEnhancer =
+                com.pixelrestore.player.processing.SesrEnhancer(application.assets)
+        } catch (_: Throwable) {
+            processingManager.mosaicRuntime.tileEnhancer = null
+        }
+        // SMCPKG_SUPPORT<<<Cursor070
         viewModelScope.launch(Dispatchers.Default) {
             _capabilities.value = DeviceCapabilityDetector(application).detect()
             resolve()
@@ -171,9 +192,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onGpuUnavailable(reason: String) {
+        // SMCPKG_SUPPORT>>>Cursor071
+        // _backend.value = ProcessingBackend.CPU
+        // processingManager.setBackend(ProcessingBackend.CPU)
+        // _pipelineNote.value = "GPU unavailable ($reason). CPU fallback is running at a reduced resolution."
+        gpuUnavailableReason = reason
         _backend.value = ProcessingBackend.CPU
         processingManager.setBackend(ProcessingBackend.CPU)
-        _pipelineNote.value = "GPU unavailable ($reason). CPU fallback is running at a reduced resolution."
+        if (latestSettings.mode != ProcessingMode.ML_ENHANCE) {
+            _pipelineNote.value = "GPU unavailable ($reason). CPU fallback is running at a reduced resolution."
+        }
+        // SMCPKG_SUPPORT<<<Cursor072
         _shaderGaps.value = emptyList()
     }
 
@@ -231,7 +260,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onCpuFailed(message: String) {
-        _pipelineNote.value = "CPU fallback failed: $message"
+        // SMCPKG_SUPPORT>>>Cursor101
+        // _pipelineNote.value = "CPU fallback failed: $message"
+        if (latestSettings.mode == ProcessingMode.ML_ENHANCE) {
+            mlCpuBlocked = true
+            _pipelineNote.value = "SESR-M5 stopped ($message). Playback stays on the GPU picture."
+            if (gpuUnavailableReason == null) {
+                _backend.value = ProcessingBackend.GPU
+                processingManager.setBackend(ProcessingBackend.GPU)
+            }
+        } else {
+            _pipelineNote.value = "CPU fallback failed: $message"
+        }
+        // SMCPKG_SUPPORT<<<Cursor102
     }
 
     fun processFrame(frame: FrameHandle): ProcessedFrame = processingManager.process(frame)
@@ -306,6 +347,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         processingManager.configureMosaic(latestSettings)
         processingManager.mosaicRuntime.compareOriginal = _compareOriginal.value
         controller.applyProfile(resolved)
+        // SMCPKG_SUPPORT>>>Cursor073
+        val ml = latestSettings.mode == ProcessingMode.ML_ENHANCE
+        // SMCPKG_SUPPORT>>>Cursor103
+        // val backend = if (gpuUnavailableReason != null || ml) {
+        val backend = if (gpuUnavailableReason != null || (ml && !mlCpuBlocked)) {
+        // SMCPKG_SUPPORT<<<Cursor104
+            ProcessingBackend.CPU
+        } else {
+            ProcessingBackend.GPU
+        }
+        _backend.value = backend
+        processingManager.setBackend(backend)
+        _pipelineNote.value = when {
+            ml -> "ML Enhance runs bundled SESR-M5 INT8 on the CPU (one 512×512 tile, 2×, blended back). It estimates detail and does not recover the original pixels."
+            gpuUnavailableReason != null -> "GPU unavailable ($gpuUnavailableReason). CPU fallback is running at a reduced resolution."
+            _pipelineNote.value?.startsWith("CPU fallback failed") == true -> _pipelineNote.value
+            else -> null
+        }
+        // SMCPKG_SUPPORT<<<Cursor074
     }
 
     private fun initialCapabilities(): DeviceCapabilities {

@@ -4,15 +4,16 @@ Local GPU Video Restoration Player.
 
 PixelRestore Player plays **one local video** at a time and can run a real-time image pipeline on the decoded frames. Nothing is uploaded. There is no account, no analytics, and no network permission.
 
-**No AI.** The app does not use TensorFlow Lite, ONNX, neural networks, downloaded models, or any remote inference API. Restoration is traditional filtering on the Android CPU and GPU.
+Playback and classical filters stay on the device. There is no account, no analytics, and no network permission. **ML Enhance** is optional: it runs the bundled SESR-M5 INT8 ONNX graph with ONNX Runtime on the CPU. It does not download weights and it does not call a cloud API. Mosaic Reconstruction itself stays classical. ML Enhance estimates detail; it does not recover the original pixels.
 
 ## Features
 
 - Storage Access Framework picker (`video/*`). The player reads the content URI. It does not request broad storage access and it does not copy the file.
 - Jetpack Media3 / ExoPlayer playback with hardware decoders preferred and software decoders as a fallback.
-- Two mutually exclusive processing modes, plus Off, owned by one `ProcessingManager`:
+- Three mutually exclusive processing modes, plus Off, owned by one `ProcessingManager`:
   - **Mosaic Reconstruction** — detects the pixelation lattice, then estimates pixels from neighboring block colors (bilinear, edge-directed, Catmull-Rom) plus block-matching across frames. This is mosaic artifact removal. It does **not** recover the original pixels.
   - **Video Enhancement** — denoise, mild deblock, scale, sharpen, and contrast/saturation. Noise reduction and sharpening can be turned off; those passes are skipped.
+  - **ML Enhance (SESR)** — optional on-device super-resolution. The APK bundles SESR-M5 INT8 (`sesr_m5_int8.onnx`, Apache-2.0, about 120 KB). The published graph is float NCHW 1×3×512×512 → 1×3×1024×1024 (2×). One ROI tile is resampled to 512, enhanced, and blended back. The player switches this mode to the CPU path. Real-ESRGAN general-x4v3 is an optional export script only and is not in the APK. RealBasicVSR weights are not bundled.
 - OpenGL ES 2.0 pipeline: hardware decode → `SurfaceTexture` (OES) → fragment shaders → `TextureView`. Reconstruction stays on the GPU. The mosaic detector reads a 192×108 center crop about twice a second so it can estimate block size and phase.
 - CPU fallback (YUV `ImageReader` plus integer filters, long edge capped at 480px) if EGL or the blit shader cannot start. The status line then says `Processing: CPU`.
 - Device capability report (cores, ABI, Android version, RAM, GLES, Vulkan feature, hardware decoder names and sizes when the platform exposes them). Missing probes stay unknown instead of being invented.
@@ -66,7 +67,7 @@ Pipeline: decoder frame → mosaic detector → grid model → spatial reconstru
 
 The old fixed-grid deblock / blur / sharpen chain is not the mosaic path anymore. Video Enhancement still uses denoise, mild deblock, scale, sharpen, and contrast.
 
-1. **MosaicDetector** scores candidate square sizes (2 through 32, including sizes that are not powers of two). For each size it searches the horizontal and vertical phase separately. A real mosaic is flat inside a block and discontinuous on the border, so the score is the border gradient divided by the interior gradient. Both axes must agree, which rejects a harmonic such as 32 when the real cell is 8. Auto samples a 192×108 center crop. If that crop has no lattice, the status line says `grid not detected` and the picture stays original until you pick a size. Manual sizes are Auto, 2×2, 4×4, 8×8, 16×16, and 32×32. Manual still estimates the phase.
+1. **MosaicDetector** scores candidate square sizes (2 through 32, including sizes that are not powers of two). For each size it searches the horizontal and vertical phase separately. A real mosaic is flat inside a block and discontinuous on the border, so the score is the border gradient divided by the interior gradient. Both axes must agree. The accept threshold is 1.15 so a blurred or soft edge can still pass. When several sizes pass, the smallest size within 85% of the best score is kept, which prefers the real cell over a larger harmonic. Auto samples a 192×108 center crop. If Auto misses, the last block is kept for 8 frames and the status line says so. After that it says to pick a size. Manual sizes are Auto, 2×2, 4×4, 8×8, 16×16, and 32×32. Manual still estimates the phase. The settings control sits at the top-right of the video surface.
 2. **Spatial reconstruction** treats each block center as one low-resolution sample. Low quality is bilinear on that lattice, then a light unsharp mask. It does not blur the mosaic squares.
 3. **Edge-aware step.** Medium and High keep a hard step only when one neighbor jumps and the other side is flat (a real edge). A smooth ramp stays bilinear, so object boundaries, text, and high-contrast structure are not smeared when the edge sits on the grid. High mixes a Catmull-Rom sample of the same lattice in smooth areas and keeps the directional sample where the step is strong.
 4. **Temporal.** Medium and High block-match a 3×3 neighborhood of block colors against the previous frame (no neural optical flow). Where the match is close, the current estimate is blended with the previous reconstruction shifted by that motion. The CPU reference searches ±1 block at Medium and ±2 at High. The GPU shader searches ±1 block so 720p stays practical.
@@ -95,6 +96,18 @@ Debug: Mosaic Debug Mode selects Original, Detected Mosaic Grid, Reconstructed (
 | SSIM (luma) | 0.973 | 0.981 | 0.991 |
 
 An aligned black/white edge stays a step after Medium (transition width 0) and becomes a 7px ramp at Low bilinear. These numbers are estimates on a synthetic lattice, not a claim that a censored face comes back.
+
+### ML Enhance (SESR-M5)
+
+Default bundled asset: `app/src/main/assets/models/sesr_m5_int8.onnx` (the Hugging Face file `sesr_nchw_int8.onnx` from `amd/ryzenai-sesr`). License text and NOTICE are next to the file. Input values are about 0..255. ONNX Runtime Android uses the CPU execution provider. NNAPI is not enabled, and the app does not look for an AMD NPU.
+
+ONNX Runtime is packaged for `arm64-v8a` and `x86_64` only. Most of the APK size is those native libraries, not the 120 KB model.
+
+The classical detector still finds the lattice. Flat mosaic cells become one ROI. `RoiTracker` smooths that box when the overlap is high and keeps the last box if a frame has no box. The ROI (or the whole frame when the lattice covers it, or when Auto has not locked a grid) is the SESR tile. The 2× output is scaled back onto that rectangle. Pixels outside the ROI stay as they were.
+
+This is heavier than the shader path. Expect the CPU fallback resolution cap (long edge 480) and dropped frames on a phone. The label in settings says it is an estimate.
+
+Optional, not packaged: `models/convert_scripts/export_realesr_general_x4v3.py` exports xinntao `realesr-general-x4v3` (BSD-3-Clause, about 4.7 MB, 4×). Do not put RealBasicVSR checkpoints in the APK.
 
 ### Enhancement passes
 

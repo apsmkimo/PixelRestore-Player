@@ -17,8 +17,17 @@ class MosaicRuntime {
         private set
     @Volatile var lastDetectMs: Float = 0f
         private set
+    @Volatile var roi: RoiBox? = null
+        private set
 
     var onGrid: ((MosaicGrid) -> Unit)? = null
+    var tileEnhancer: TileEnhancer? = null
+
+    // SMCPKG_SUPPORT>>>Cursor037
+    private val roiTracker = RoiTracker()
+    private val sesrInput = FloatArray(SesrTiles.inputFloats())
+    private var holdFrames = 0
+    // SMCPKG_SUPPORT<<<Cursor038
 
     private var cpuPreviousSource: IntArray? = null
     private var cpuPreviousReconstruction: IntArray? = null
@@ -26,7 +35,12 @@ class MosaicRuntime {
     private var cpuHeight = 0
 
     fun configure(settings: UserSettings) {
-        manualBlock = settings.mosaicBlockSize.pixels
+        val nextManual = settings.mosaicBlockSize.pixels
+        if (nextManual != manualBlock) {
+            holdFrames = 0
+            roiTracker.clear()
+        }
+        manualBlock = nextManual
         quality = settings.mosaicQuality
         debugView = if (settings.mosaicDebug) settings.mosaicDebugView else MosaicDebugView.FINAL
     }
@@ -45,15 +59,43 @@ class MosaicRuntime {
         val start = System.nanoTime()
         val found = MosaicDetector.detect(argb, cropWidth, cropHeight, manualBlock)
         lastDetectMs = (System.nanoTime() - start) / 1_000_000f
+        // SMCPKG_SUPPORT>>>Cursor039
+        // val next = if (!found.usable) {
+        //     MosaicGrid.UNDETECTED.copy(confidence = found.confidence)
+        // } else {
+        //     val size = found.blockWidth.coerceAtLeast(2)
+        //     found.copy(
+        //         offsetX = floorMod(cropX + found.offsetX, size),
+        //         offsetY = floorMod(cropY + found.offsetY, size),
+        //     )
+        // }
         val next = if (!found.usable) {
-            MosaicGrid.UNDETECTED.copy(confidence = found.confidence)
+            val previous = grid
+            if (previous.usable && holdFrames < MAX_HOLD_FRAMES) {
+                holdFrames += 1
+                previous.copy(
+                    confidence = found.confidence,
+                    held = true,
+                    note = "Auto missed this frame. Keeping ${previous.blockWidth}×${previous.blockHeight}.",
+                )
+            } else {
+                holdFrames = 0
+                MosaicGrid.UNDETECTED.copy(
+                    confidence = found.confidence,
+                    note = "Auto did not find a mosaic. Pick a block size.",
+                )
+            }
         } else {
+            holdFrames = 0
             val size = found.blockWidth.coerceAtLeast(2)
             found.copy(
                 offsetX = floorMod(cropX + found.offsetX, size),
                 offsetY = floorMod(cropY + found.offsetY, size),
+                held = false,
+                note = "",
             )
         }
+        // SMCPKG_SUPPORT<<<Cursor040
         grid = next
         onGrid?.invoke(next)
     }
@@ -91,9 +133,90 @@ class MosaicRuntime {
         return result.pixels
     }
 
+    /**
+     * Classical detect + ROI track, then one SESR-M5 tile blended onto the ROI.
+     * Without a loaded model the frame is unchanged and [MosaicGrid.note] says so.
+     */
+    fun processMl(pixels: IntArray, width: Int, height: Int): IntArray {
+        // SMCPKG_SUPPORT>>>Cursor091
+        if (width < 2 || height < 2 || pixels.size < width * height) {
+            publishNote("SESR-M5 skipped (empty frame).")
+            return pixels.copyOf()
+        }
+        if (compareOriginal) {
+            observeCenter(pixels, width, height)
+            return pixels.copyOf()
+        }
+        return try {
+            observeCenter(pixels, width, height)
+            val region = if (grid.usable) {
+                RoiExtractor.mosaicRegion(pixels, width, height, grid) ?: RoiBox(0, 0, width, height)
+            } else {
+                RoiBox(0, 0, width, height)
+            }
+            val tracked = roiTracker.update(region)
+            roi = tracked
+            val box = tracked
+            val enhancer = tileEnhancer
+            if (enhancer == null || box == null || box.width < 2 || box.height < 2) {
+                return classicalFallback("SESR-M5 is not loaded. Using mosaic reconstruction.", pixels, width, height)
+            }
+            SesrTiles.packRgbNchw(pixels, width, height, box, sesrInput)
+            val enhanced = enhancer.enhance(sesrInput)
+            if (enhanced == null) {
+                val why = (enhancer as? SesrEnhancer)?.status ?: "SESR-M5 did not run"
+                return classicalFallback("$why. Using mosaic reconstruction.", pixels, width, height)
+            }
+            val blended = SesrTiles.blend(pixels, width, height, box, enhanced)
+            publishNote("SESR-M5 2× estimate on ${box.width}×${box.height}. Not the original pixels.")
+            blended
+        } catch (error: Throwable) {
+            classicalFallback(
+                "SESR-M5 failed (${error.javaClass.simpleName}). Using mosaic reconstruction.",
+                pixels,
+                width,
+                height,
+            )
+        }
+        // SMCPKG_SUPPORT<<<Cursor092
+    }
+
+    private fun classicalFallback(message: String, pixels: IntArray, width: Int, height: Int): IntArray {
+        val restored = try {
+            processCpu(pixels, width, height)
+        } catch (_: Throwable) {
+            pixels.copyOf()
+        }
+        publishNote(message)
+        return restored
+    }
+
+    private fun observeCenter(pixels: IntArray, width: Int, height: Int) {
+        val cropW = width.coerceAtMost(192)
+        val cropH = height.coerceAtMost(108)
+        val cropX = ((width - cropW) / 2).coerceAtLeast(0)
+        val cropY = ((height - cropH) / 2).coerceAtLeast(0)
+        val crop = IntArray(cropW * cropH)
+        for (y in 0 until cropH) {
+            val src = (cropY + y) * width + cropX
+            pixels.copyInto(crop, y * cropW, src, src + cropW)
+        }
+        observeCrop(crop, cropW, cropH, cropX, cropY)
+    }
+
+    private fun publishNote(text: String) {
+        val next = grid.copy(note = text)
+        grid = next
+        onGrid?.invoke(next)
+    }
+
     private fun floorMod(value: Int, size: Int): Int {
         val mod = value % size
         return if (mod < 0) mod + size else mod
+    }
+
+    private companion object {
+        const val MAX_HOLD_FRAMES = 8
     }
 }
 

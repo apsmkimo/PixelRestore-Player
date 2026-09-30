@@ -90,8 +90,12 @@ class CpuVideoOutput(
                 onFrame(bitmap)
                 onTiming(timing)
             }
-        } catch (error: RuntimeException) {
-            fail(error.message ?: "CPU processing failed")
+        // SMCPKG_SUPPORT>>>Cursor093
+        // } catch (error: RuntimeException) {
+        //     fail(error.message ?: "CPU processing failed")
+        } catch (error: Throwable) {
+            fail(error.javaClass.simpleName + ": " + (error.message ?: "CPU processing failed"))
+        // SMCPKG_SUPPORT<<<Cursor094
         } finally {
             image.close()
             busy = false

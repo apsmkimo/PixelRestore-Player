@@ -18,6 +18,10 @@ enum class FilterType {
     MOSAIC_RECONSTRUCT,
     /** Block-match blend with the previous reconstruction, then sharpen. */
     MOSAIC_TEMPORAL,
+    // SMCPKG_SUPPORT>>>Cursor035
+    /** CPU SESR-M5 tile. The GPU path blits; the pixels are enhanced on the CPU. */
+    ML_ENHANCE,
+    // SMCPKG_SUPPORT<<<Cursor036
 }
 
 data class FilterPass(

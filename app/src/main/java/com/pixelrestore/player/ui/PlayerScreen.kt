@@ -146,6 +146,18 @@ fun PlayerScreen(
                         .padding(8.dp),
                 )
             }
+            // SMCPKG_SUPPORT>>>Cursor053
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.align(Alignment.TopEnd),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = stringResource(R.string.settings),
+                    tint = Color.White,
+                )
+            }
+            // SMCPKG_SUPPORT<<<Cursor054
         }
 
         Text(
@@ -187,7 +199,10 @@ fun PlayerScreen(
                     contentDescription = stringResource(if (playback.isPlaying) R.string.pause else R.string.play),
                 )
             }
-            if (settings.mode == ProcessingMode.MOSAIC_RESTORATION) {
+            // SMCPKG_SUPPORT>>>Cursor055
+            // if (settings.mode == ProcessingMode.MOSAIC_RESTORATION) {
+            if (settings.mode == ProcessingMode.MOSAIC_RESTORATION || settings.mode == ProcessingMode.ML_ENHANCE) {
+            // SMCPKG_SUPPORT<<<Cursor056
                 Button(onClick = onToggleCompare) {
                     Text(text = stringResource(if (compareOriginal) R.string.compare_processed else R.string.compare_original))
                 }
@@ -196,9 +211,11 @@ fun PlayerScreen(
                 Icon(Icons.Filled.VideoLibrary, contentDescription = null)
                 Text(text = stringResource(R.string.pick_video), modifier = Modifier.padding(start = 8.dp))
             }
-            IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
-            }
+            // SMCPKG_SUPPORT>>>Cursor057
+            // IconButton(onClick = onOpenSettings) {
+            //     Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
+            // }
+            // SMCPKG_SUPPORT<<<Cursor058
         }
     }
 }
@@ -274,8 +291,24 @@ private fun CpuSurface(
             onFailed = onCpuFailed,
             budgetMs = { budgetHolder.floatValue },
         )
-        val surface = output.start(width, height)
-        onAttachSurface(surface)
+        // SMCPKG_SUPPORT>>>Cursor095
+        // val surface = output.start(width, height)
+        // onAttachSurface(surface)
+        val surface = try {
+            output.start(width, height)
+        } catch (error: Throwable) {
+            onCpuFailed(error.javaClass.simpleName + ": " + (error.message ?: "CPU output failed"))
+            output.release()
+            return@DisposableEffect onDispose { }
+        }
+        try {
+            onAttachSurface(surface)
+        } catch (error: Throwable) {
+            onCpuFailed(error.javaClass.simpleName + ": " + (error.message ?: "CPU surface failed"))
+            output.release()
+            return@DisposableEffect onDispose { }
+        }
+        // SMCPKG_SUPPORT<<<Cursor096
         onDispose {
             onDetachSurface(surface)
             output.release()
@@ -319,13 +352,11 @@ private fun statusLine(profile: ResolvedProfile, backend: ProcessingBackend, mos
     val mode = when (profile.mode) {
         ProcessingMode.OFF -> "Off"
         ProcessingMode.MOSAIC_RESTORATION -> {
-            val grid = if (mosaicGrid.usable) {
-                "${mosaicGrid.blockWidth}×${mosaicGrid.blockHeight} @ ${mosaicGrid.offsetX},${mosaicGrid.offsetY}"
-            } else {
-                "grid not detected"
-            }
-            "Mosaic Reconstruction ($grid)"
+            "Mosaic Reconstruction (${gridStatus(mosaicGrid)})"
         }
+        // SMCPKG_SUPPORT>>>Cursor059
+        ProcessingMode.ML_ENHANCE -> "ML Enhance SESR-M5 (${gridStatus(mosaicGrid)})"
+        // SMCPKG_SUPPORT<<<Cursor060
         else -> backend.label
     }
     val size = if (profile.outputWidth > 0 && profile.outputHeight > 0) {
@@ -333,5 +364,16 @@ private fun statusLine(profile: ResolvedProfile, backend: ProcessingBackend, mos
     } else {
         "—"
     }
-    return "Processing: $mode · $size · ${profile.targetFps} FPS target"
+    val note = mosaicGrid.note.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+    return "Processing: $mode · $size · ${profile.targetFps} FPS target$note"
+}
+
+private fun gridStatus(mosaicGrid: MosaicGrid): String {
+    return when {
+        mosaicGrid.usable && mosaicGrid.held ->
+            "kept ${mosaicGrid.blockWidth}×${mosaicGrid.blockHeight}"
+        mosaicGrid.usable ->
+            "${mosaicGrid.blockWidth}×${mosaicGrid.blockHeight} @ ${mosaicGrid.offsetX},${mosaicGrid.offsetY}"
+        else -> "grid not detected"
+    }
 }
